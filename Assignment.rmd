@@ -1,0 +1,211 @@
+---
+title: "Practical Machine Learning Assignment"
+author: "Zukiswa Mdingi"
+date: "June 2, 2021"
+output: html_document
+---
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+
+## Data
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+## Introduction
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+
+
+```{r}
+library(lattice)
+library(ggplot2)
+library(caret)
+library(randomForest)
+library(e1071)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(RColorBrewer)
+
+set.seed(233)
+
+```
+
+```{r}
+
+pml_training <- read.csv("pml-training.csv")
+
+pml_testing <- read.csv("pml-testing.csv")
+
+dim(pml_training)
+```
+
+```{r}
+dim(pml_testing)
+
+```
+
+Splitting the data and creating a testing and training dataset
+
+```{r}
+
+in_train <- createDataPartition(pml_training$classe, p=0.75, list = FALSE)
+
+training_data <- pml_training[in_train,]
+
+testing_data <- pml_training[-in_train,]
+
+dim(training_data)
+```
+
+```{r}
+
+dim(testing_data)
+
+```
+
+
+Removing of NA's and near zero variance observations in the training and testing datasets
+
+```{r}
+
+near.zero.var <- nearZeroVar(training_data)
+
+training_data <- training_data[, -near.zero.var]
+
+testing_data  <- testing_data[, -near.zero.var]
+
+
+na_data <- sapply(pml_training, function(x) mean(is.na(x))) > 0.95
+
+training_data <- training_data[, (sapply(training_data, function(x) mean(is.na(x))) > 0.95)==FALSE]
+
+testing_data  <- testing_data[, (sapply(training_data, function(x) mean(is.na(x))) > 0.95)==FALSE]
+
+
+
+dim(training_data)
+
+
+```
+
+```{r}
+
+dim(testing_data)
+
+```
+
+Removing columns in the datasets that will not be used in the exercise (Removing columns 1-5)
+
+```{r}
+
+training_data <- training_data[ , -(1:5)]
+
+testing_data <- testing_data[ , -(1:5)]
+
+dim(training_data)
+
+```
+
+```{r}
+dim(testing_data)
+
+```
+
+
+## Selecting a model
+
+### Decision Tree model
+
+```{r}
+
+rpart.model <- rpart(classe ~ ., data=training_data, method="class")
+
+fancyRpartPlot(rpart.model)
+
+```
+
+```{r}
+
+predict_decision_tree <- predict(rpart.model, newdata = testing_data, type="class")
+
+matrix_decision_tree <- confusionMatrix(predict_decision_tree, factor(testing_data$classe))
+
+matrix_decision_tree
+```
+
+The model has a low accuracy rate of 0.7473 (74.73%) which is not good enough.
+
+### Random Forest Model
+
+```{r}
+
+fitting_rf <- train(classe ~ ., data=training_data, method="rf", trControl=trainControl(method="cv", 3), ntree=100)
+
+fitting_rf$finalModel
+
+```
+
+
+
+```{r}
+
+prediction_tree <- predict(fitting_rf, newdata = testing_data)
+
+confusion_matrix <- confusionMatrix(prediction_tree, factor(testing_data$classe))
+
+confusion_matrix
+
+```
+
+The model has a high accuracy rate of 0.9982 (99.82%)
+
+### Generalized Boosted Model (GBM)
+
+```{r}
+
+ctrl_GBM <- trainControl(method = "repeatedcv", number = 3, repeats = 1)
+
+fit_GBM  <- train(classe ~ ., data = training_data, method = "gbm",
+                  trControl = ctrl_GBM, verbose = FALSE)
+
+fit_GBM$finalModel
+
+```
+
+
+```{r}
+
+predict_GBM <- predict(fit_GBM, newdata = testing_data)
+
+conf_matrix_GBM <- confusionMatrix(predict_GBM, factor(testing_data$classe))
+
+conf_matrix_GBM
+
+```
+
+The accuracy for the GBM can be considered high with an accuracy rate of 0.9847 (98.47%).
+
+## Best Predictive Model to the Test Data
+
+For the exercise the random forest model will be used because of its high accuracy.
+
+```{r}
+predict_quiz <- as.data.frame(predict(fitting_rf, newdata = pml_testing))
+predict_quiz
+
+```
+
+
