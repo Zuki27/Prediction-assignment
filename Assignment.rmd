@@ -28,7 +28,7 @@ The goal of your project is to predict the manner in which they did the exercise
 
 
 
-```{r}
+```{r, echo=FALSE}
 library(lattice)
 library(ggplot2)
 library(caret)
